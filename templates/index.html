@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Stock Prediction Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            surface: '#FFFFFF',
+            surfaceAlt: '#F8FAFC',
+            bg: '#F8FAFC',
+            border: '#E2E8F0',
+            accent: '#4338CA',
+            accentSoft: '#EEF2FF',
+            success: '#059669',
+            danger: '#DB2777',
+            warning: '#D97706',
+            textPrimary: '#0F172A',
+            textSecondary: '#475569',
+            textMuted: '#64748B'
+          },
+          boxShadow: {
+            panel: '0 10px 30px rgba(15, 23, 42, 0.08)',
+            panelHover: '0 18px 40px rgba(15, 23, 42, 0.12)'
+          }
+        }
+      }
+    }
+  </script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/styles.css?v=3" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900">
+  <div class="page-shell min-h-screen">
+
+    <!-- ============ TOP BAR ============ -->
+    <header class="topbar bg-white border-b border-slate-200 shadow-sm">
+      <div class="topbar-inner flex flex-wrap items-center justify-between gap-4">
+        <div class="brand flex items-center gap-3">
+          <span class="brand-mark bg-slate-900 text-white shadow-sm" aria-hidden="true">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"></polyline><polyline points="14 6 21 6 21 13"></polyline></svg>
+          </span>
+          <div class="brand-text">
+            <p class="eyebrow">Notebook to Web App</p>
+            <h1>Stock Prediction Lab</h1>
+          </div>
+        </div>
+        <div class="topbar-badge inline-flex items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-medium text-slate-600">
+          <span class="pulse-dot" aria-hidden="true"></span>
+          Train · Compare · Trade · Validate · Forecast
+        </div>
+      </div>
+    </header>
+
+    <div class="app-body">
+
+      <!-- ============ SIDEBAR ============ -->
+      <aside class="dashboard-sidebar">
+        <div class="sidebar-inner">
+          <div class="sidebar-head">
+            <h2>Run configuration</h2>
+            <p class="sidebar-sub">Set your parameters, then run the pipeline.</p>
+          </div>
+
+          <form id="run-form" class="control-form">
+
+              <div class="field-group">
+                <span class="field-group-label">Instrument</span>
+                <div class="row g-3">
+                  <div class="col-6">
+                    <label class="form-label" for="f-symbol">Stock symbol</label>
+                    <input class="form-control" id="f-symbol" name="stock_symbol" value="GP" required />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label" for="f-exchange">Exchange</label>
+                    <input class="form-control" id="f-exchange" name="exchange" value="DSEBD" required />
+                  </div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <span class="field-group-label">Dataset</span>
+                <div class="row g-3">
+                  <div class="col-6">
+                    <label class="form-label" for="f-length">Dataset length</label>
+                    <input class="form-control" type="number" id="f-length" name="dataset_length" value="1000" min="120" max="10000" />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label" for="f-split">Train split</label>
+                    <input class="form-control" type="number" step="0.01" id="f-split" name="train_split" value="0.8" min="0.5" max="0.95" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <span class="field-group-label">Model inputs</span>
+                <div class="row g-3">
+                  <div class="col-6">
+                    <label class="form-label" for="f-timestep">Time step</label>
+                    <input class="form-control" type="number" id="f-timestep" name="time_step" value="60" min="5" max="365" />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label" for="f-ema">EMA period</label>
+                    <input class="form-control" type="number" id="f-ema" name="ema_period" value="9" min="2" max="365" />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label" for="f-forecast">Forecast days</label>
+                    <input class="form-control" type="number" id="f-forecast" name="forecast_days" value="5" min="1" max="30" />
+                  </div>
+                  <div class="col-6">
+                    <label class="form-label" for="f-walkforward">Walk forward days</label>
+                    <input class="form-control" type="number" id="f-walkforward" name="walk_forward_days" value="5" min="1" max="30" />
+                  </div>
+                </div>
+              </div>
+
+              <div class="field-group">
+                <span class="field-group-label">Reproducibility</span>
+                <label class="form-label" for="f-seed">Random seed</label>
+                <input class="form-control" type="number" id="f-seed" name="random_seed" placeholder="Optional" />
+              </div>
+
+              <div class="field-group model-box">
+                <div class="model-box-head">
+                  <span class="field-group-label mb-0">Model selection</span>
+                  <div class="model-box-actions">
+                    <button type="button" class="chip-btn" id="select-all-models">All</button>
+                    <button type="button" class="chip-btn" id="clear-all-models">None</button>
+                  </div>
+                </div>
+                <div class="model-list p-6">
+                  {% for model in model_order %}
+                  <div class="form-check model-check">
+                    <input class="form-check-input" type="checkbox" name="selected_models" value="{{ model }}" id="model-{{ loop.index }}" {% if model in model_order %}checked{% endif %}>
+                    <label class="form-check-label" for="model-{{ loop.index }}">{{ model }}</label>
+                  </div>
+                  {% endfor %}
+                </div>
+              </div>
+
+              <button class="btn-run" type="submit">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Run project
+              </button>
+            </form>
+        </div>
+      </aside>
+
+      <!-- ============ MAIN ============ -->
+      <main class="dashboard-main">
+        <div class="dashboard-main-inner">
+
+          <!-- Row 1 : Dataset Summary + Pipeline Progress -->
+          <div class="dashboard-grid mb-4">
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Pipeline progress</h2>
+                    <p class="section-sub" id="progress-stage">Waiting for a run.</p>
+                  </div>
+                  <div class="progress-pill"><span id="progress-text">0%</span></div>
+                </div>
+                <div class="progress dashboard-progress">
+                  <div id="progress-bar" class="progress-bar" role="progressbar" style="width: 0%"></div>
+                </div>
+                <div id="status-alert" class="alert mt-3 mb-0 d-none" role="alert"></div>
+              </div>
+            </section>
+
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Dataset summary</h2>
+                    <p class="section-sub">Snapshot of the data used for this run</p>
+                  </div>
+                </div>
+                <div id="dataset-summary" class="stats-grid stats-grid-compact"></div>
+              </div>
+            </section>
+          </div>
+
+          <div id="results-root" class="dashboard-grid d-none">
+
+            <!-- Pipeline status note
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body status-strip">
+                <div class="status-strip-item">
+                  <span class="status-strip-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"></path><path d="m16.2 7.8 2.9-2.9"></path><path d="M18 12h4"></path><path d="m16.2 16.2 2.9 2.9"></path><path d="M12 18v4"></path><path d="m4.9 19.1 2.9-2.9"></path><path d="M2 12h4"></path><path d="m4.9 4.9 2.9 2.9"></path></svg>
+                  </span>
+                  The most important charts stay above the fold.
+                </div>
+                <div class="status-strip-item">
+                  <span class="status-strip-icon" aria-hidden="true">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"></rect><path d="M3 10h18"></path></svg>
+                  </span>
+                  Run controls stay visible in the sticky sidebar.
+                </div>
+              </div>
+            </section> -->
+
+            <!-- Row 2 : Prediction Comparison -->
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Prediction comparison</h2>
+                    <p class="section-sub">Predicted vs. actual close across selected models</p>
+                  </div>
+                  <span class="section-chip">Primary chart</span>
+                </div>
+                <div id="prediction-comparison" class="plot-box plot-box-lg"></div>
+              </div>
+            </section>
+
+            <!-- Row 3 : Model Performance -->
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Model performance</h2>
+                    <p class="section-sub">RMSE, MAE, MAPE and R² by model — best model highlighted in green</p>
+                  </div>
+                </div>
+                <div class="table-wrap">
+                  <div id="model-performance" class="table-responsive"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Row 4 : Trading Strategy -->
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Trading strategy</h2>
+                    <p class="section-sub">Signal overlay for the best model</p>
+                  </div>
+                  <span class="section-chip">Best model only</span>
+                </div>
+                <div id="trading-strategy" class="plot-box plot-box-md"></div>
+              </div>
+            </section>
+
+            <!-- Row 5 : Strategy Performance -->
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Strategy performance</h2>
+                    <p class="section-sub">Return, win rate, Sharpe, drawdown</p>
+                  </div>
+                </div>
+                <div id="strategy-performance" class="stats-grid stats-grid-compact"></div>
+              </div>
+            </section>
+
+            <!-- Row 6 : Equity Curve -->
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Equity curve</h2>
+                    <p class="section-sub">Portfolio value over the backtest window</p>
+                  </div>
+                </div>
+                <div id="equity-curve" class="plot-box plot-box-md"></div>
+              </div>
+            </section>
+
+            <!-- Row 7 : Walk Forward + Future Prediction -->
+            <section class="grid-card panel grid-span-6">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Walk forward validation</h2>
+                    <p class="section-sub">Rolling out-of-sample checks</p>
+                  </div>
+                </div>
+                <div id="walk-forward-plot" class="plot-box plot-box-sm mb-3"></div>
+                <div class="table-wrap">
+                  <div id="walk-forward-table" class="table-responsive"></div>
+                </div>
+              </div>
+            </section>
+
+            <section class="grid-card panel grid-span-6">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Future prediction</h2>
+                    <p class="section-sub">Forward-looking price path</p>
+                  </div>
+                </div>
+                <div id="future-prediction" class="plot-box plot-box-sm mb-3"></div>
+                <div class="table-wrap">
+                  <div id="future-table" class="table-responsive"></div>
+                </div>
+              </div>
+            </section>
+
+            <!-- Row 8 : Downloads -->
+            <section class="grid-card panel grid-span-12">
+              <div class="card-body">
+                <div class="section-head">
+                  <div>
+                    <h2>Downloads</h2>
+                    <p class="section-sub">Export results for this run</p>
+                  </div>
+                  <span class="section-chip">Optional</span>
+                </div>
+                <div class="download-row">
+                  <button class="btn-download" id="download-csv" type="button">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    CSV
+                  </button>
+                  <button class="btn-download" id="download-excel" type="button">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                    Excel
+                  </button>
+                  <button class="btn-download btn-download-ghost" id="download-report" type="button">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    Trading report
+                  </button>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </div>
+      </main>
+    </div>
+  </div>
+
+  <script>
+    window.MODEL_ORDER = {{ model_order | default([]) | tojson }};
+  </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
+  <script src="/static/app.js?v=2"></script>
+</body>
+</html>
