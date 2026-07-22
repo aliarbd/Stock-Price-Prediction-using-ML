@@ -27,3 +27,20 @@ fastapi>=0.95.0
 uvicorn>=0.22.0
 jinja2>=3.1.0
 python-multipart>=0.0.6
+
+
+# python -m pip install -r requirements.txt
+
+# 3. Virtual Environment তৈরি করা হয়নি
+
+# যদি .venv না থাকে, তাহলে তৈরি করুন:
+
+# python -m venv .venv
+
+# তারপর activate করুন:
+
+# .\.venv\Scripts\Activate.ps1
+
+# এরপর:
+
+# python -m uvicorn app:app --reload --port 8001
