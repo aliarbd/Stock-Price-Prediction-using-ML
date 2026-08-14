@@ -1,0 +1,32 @@
+<!-- Common Navigation Header Component -->
+<header class="topbar bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
+  <div class="topbar-inner flex flex-wrap items-center justify-between gap-4 py-3 px-6 max-w-7xl mx-auto">
+    <div class="brand flex items-center gap-3">
+      <a href="/" class="flex items-center gap-3 no-underline text-slate-900">
+        <span class="brand-mark bg-indigo-600 text-white shadow-sm p-2 rounded-lg flex items-center justify-center">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 17 9 11 13 15 21 6"></polyline><polyline points="14 6 21 6 21 13"></polyline></svg>
+        </span>
+        <div class="brand-text">
+          <p class="eyebrow text-xs uppercase tracking-wider text-indigo-600 font-bold mb-0">Stock Prediction Lab</p>
+          <h1 class="text-lg font-bold text-slate-900 mb-0">Market AI Dashboard</h1>
+        </div>
+      </a>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <nav class="flex items-center gap-2 bg-slate-100 p-1.5 rounded-xl border border-slate-200">
+      <a href="/" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {% if active_page == 'dashboard' %}bg-white text-indigo-600 shadow-sm font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-200/60{% endif %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7"></rect><rect x="14" y="3" width="7" height="7"></rect><rect x="14" y="14" width="7" height="7"></rect><rect x="3" y="14" width="7" height="7"></rect></svg>
+        Dashboard / Training
+      </a>
+      <a href="/models" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {% if active_page == 'models' %}bg-white text-indigo-600 shadow-sm font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-200/60{% endif %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+        Saved Models
+      </a>
+      <a href="/predict" class="nav-tab px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 flex items-center gap-2 {% if active_page == 'predict' %}bg-white text-indigo-600 shadow-sm font-semibold{% else %}text-slate-600 hover:text-slate-900 hover:bg-slate-200/60{% endif %}">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+        Live Prediction
+      </a>
+    </nav>
+  </div>
+</header>

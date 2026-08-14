@@ -110,6 +110,43 @@ function renderPlot(targetId, fig) {
   Plotly.react(target, fig.data, layout, config);
 }
 
+let currentJobId = null;
+
+async function saveModelFromRun(modelName, btnEl) {
+  if (!currentJobId) {
+    alert("No active run found to save from.");
+    return;
+  }
+
+  btnEl.disabled = true;
+  btnEl.innerHTML = '<span class="spinner-border spinner-border-sm me-1" role="status"></span> Saving...';
+
+  try {
+    const response = await fetch("/api/models/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        job_id: currentJobId,
+        model_name: modelName
+      }),
+    });
+
+    if (!response.ok) {
+      const err = await response.json();
+      throw new Error(err.detail || "Failed to save model.");
+    }
+
+    const data = await response.json();
+    btnEl.className = "btn btn-sm btn-success text-xs font-semibold px-2 py-1";
+    btnEl.innerHTML = `✓ Saved (${data.model_id.substring(0, 6)})`;
+    setStatus(`✓ Model saved successfully! Model: ${data.name} | Model ID: ${data.model_id}`, "success");
+  } catch (error) {
+    btnEl.disabled = false;
+    btnEl.innerHTML = "Save Model";
+    alert("Error saving model: " + error.message);
+  }
+}
+
 function renderTable(targetId, rows, highlightBest = false) {
   const target = document.getElementById(targetId);
   if (!target) return;
@@ -118,12 +155,16 @@ function renderTable(targetId, rows, highlightBest = false) {
     return;
   }
 
+  const isModelPerf = targetId === "model-performance";
   const headers = Object.keys(rows[0]);
   const table = document.createElement("table");
   table.className = "table table-sm table-hover align-middle mb-0";
   table.innerHTML = `
     <thead>
-      <tr>${headers.map((header) => `<th>${header}</th>`).join("")}</tr>
+      <tr>
+        ${headers.map((header) => `<th>${header}</th>`).join("")}
+        ${isModelPerf ? '<th>Actions</th>' : ''}
+      </tr>
     </thead>
     <tbody>
       ${rows
@@ -131,6 +172,14 @@ function renderTable(targetId, rows, highlightBest = false) {
           (row, index) => `
         <tr class="${highlightBest && index === 0 ? "best-model" : ""}">
           ${headers.map((header) => `<td>${row[header] ?? ""}</td>`).join("")}
+          ${isModelPerf ? `
+            <td>
+              <button onclick="saveModelFromRun('${row.Model}', this)" class="btn btn-sm bg-indigo-600 text-white hover:bg-indigo-700 font-medium px-2.5 py-1 text-xs rounded-lg inline-flex items-center gap-1">
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                Save Model
+              </button>
+            </td>
+          ` : ''}
         </tr>
       `
         )
@@ -183,10 +232,33 @@ function renderResults(result) {
   resizePlots();
 }
 
+async function safeFetchJson(url, options = {}) {
+  const response = await fetch(url, options);
+  const text = await response.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch (err) {
+    throw new Error(`Server returned invalid response (${response.status}): ${text || response.statusText}`);
+  }
+
+  if (!response.ok) {
+    const errorMsg = data?.error || data?.detail || data?.message || `Server error (${response.status})`;
+    throw new Error(errorMsg);
+  }
+
+  return data;
+}
+
 async function pollJob(jobId) {
   while (true) {
-    const response = await fetch(`/api/runs/${jobId}`);
-    const payload = await response.json();
+    let payload;
+    try {
+      payload = await safeFetchJson(`/api/runs/${jobId}`);
+    } catch (err) {
+      setStatus(`Run query error: ${err.message}`, "danger");
+      return;
+    }
 
     setProgress(payload.progress ?? 0, payload.stage || "Running...");
 
@@ -196,8 +268,9 @@ async function pollJob(jobId) {
       return;
     }
 
-    if (payload.status === "error") {
-      setStatus(payload.error || "Analysis failed.", "danger");
+    if (payload.status === "error" || payload.status === "failed") {
+      const errMsg = payload.error || payload.detail || "Analysis failed.";
+      setStatus(errMsg, "danger");
       return;
     }
 
@@ -356,6 +429,7 @@ form.addEventListener("submit", async (event) => {
     }
 
     const payload = await response.json();
+    currentJobId = payload.job_id;
     setStatus("Run started. Working through the notebook pipeline...", "primary");
     await pollJob(payload.job_id);
   } catch (error) {

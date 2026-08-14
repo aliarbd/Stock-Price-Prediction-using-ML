@@ -1,0 +1,483 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Live Prediction & Monitoring Dashboard — Stock Prediction Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/styles.css?v=4" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen">
+  
+  {% include 'nav.html' %}
+
+  <div class="max-w-7xl mx-auto py-8 px-6">
+    <div class="mb-8 flex flex-wrap items-center justify-between gap-4">
+      <div>
+        <h1 class="text-2xl font-bold text-slate-900">Saved Model Monitoring & Live Prediction Dashboard</h1>
+        <p class="text-slate-500 text-sm mt-1">Real-time zero-retrain price forecasting, post-save actual-vs-predicted tracking, strategy backtesting, and live signal detection.</p>
+      </div>
+    </div>
+
+    <!-- Alert status banner -->
+    <div id="predict-alert" class="alert alert-info d-none mb-6" role="alert"></div>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      
+      <!-- Left Column: Controls & Selected Model Info -->
+      <div class="space-y-6">
+        <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+          <label class="form-label font-bold text-slate-800 text-sm mb-2" for="select-model">Select Saved Model</label>
+          <select id="select-model" class="form-select text-sm py-2.5 rounded-xl border-slate-300 focus:border-indigo-500 focus:ring-indigo-500">
+            <option value="">-- Choose a Saved Model --</option>
+          </select>
+
+          <!-- Model Specs Preview -->
+          <div id="selected-model-specs" class="mt-6 pt-4 border-t border-slate-100 hidden">
+            <div class="flex items-center justify-between mb-3">
+              <span id="spec-name" class="font-bold text-slate-900 text-base"></span>
+              <span id="spec-type" class="px-2.5 py-0.5 text-xs font-semibold rounded-full bg-indigo-50 text-indigo-700"></span>
+            </div>
+
+            <div class="space-y-2 text-xs text-slate-600 bg-slate-50 p-4 rounded-xl border border-slate-100 mb-6">
+              <div class="flex justify-between"><span>Stock Symbol:</span><strong id="spec-symbol" class="text-slate-800"></strong></div>
+              <div class="flex justify-between"><span>Exchange:</span><strong id="spec-exchange" class="text-slate-800"></strong></div>
+              <div class="flex justify-between"><span>Timestep Lookback:</span><strong id="spec-timestep" class="text-slate-800"></strong></div>
+              <div class="flex justify-between"><span>Test RMSE:</span><strong id="spec-rmse" class="text-slate-800"></strong></div>
+              <div class="flex justify-between"><span>Test Dir. Accuracy:</span><strong id="spec-da" class="text-emerald-600"></strong></div>
+            </div>
+
+            <button id="btn-run-predict" class="w-full btn bg-indigo-600 text-white hover:bg-indigo-700 font-bold py-3 rounded-xl shadow-md text-sm flex items-center justify-center gap-2">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+              Generate Live Prediction
+            </button>
+          </div>
+        </div>
+
+        <!-- Current Signal Card -->
+        <div id="current-signal-card" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hidden">
+          <div class="flex items-center justify-between mb-3 pb-2 border-b border-slate-100">
+            <span class="text-xs uppercase tracking-wider font-extrabold text-slate-400">Current Trading Signal</span>
+            <span id="signal-badge" class="px-3 py-1 text-sm font-black rounded-lg bg-emerald-100 text-emerald-800">BUY</span>
+          </div>
+          <div class="space-y-3">
+            <div>
+              <span class="text-xs text-slate-400 font-medium block">Current Position Status</span>
+              <span id="signal-position" class="font-bold text-slate-800 text-sm">In Position (Long)</span>
+            </div>
+            <div>
+              <span class="text-xs text-slate-400 font-medium block">Signal Rationale</span>
+              <p id="signal-rationale" class="text-xs text-slate-600 mt-0.5 leading-relaxed">-</p>
+            </div>
+            <div class="pt-2 border-t border-slate-100 text-xs grid grid-cols-2 gap-2">
+              <div><span class="text-slate-400">Next Target:</span> <strong id="sig-pred-val" class="text-indigo-600 block">$0.00</strong></div>
+              <div><span class="text-slate-400">EMA Filter:</span> <strong id="sig-ema-val" class="text-slate-700 block">$0.00</strong></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Right Column: Monitoring & Results -->
+      <div class="lg:col-span-2 space-y-6">
+        
+        <!-- Next-Day Prediction Output Card -->
+        <div id="prediction-result-card" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm hidden">
+          <div class="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-slate-100 mb-6">
+            <div>
+              <span class="text-xs uppercase tracking-wider font-bold text-slate-400">Next Business Day Forecast</span>
+              <h3 class="text-xl font-extrabold text-slate-900 mt-0.5" id="res-target-date">-</h3>
+            </div>
+            <div class="text-right">
+              <span class="text-xs text-slate-400 font-medium block">Latest Market Observation</span>
+              <span class="text-sm font-semibold text-slate-700" id="res-input-date">-</span>
+            </div>
+          </div>
+
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+            <div class="p-4 bg-indigo-50/60 rounded-xl border border-indigo-100">
+              <span class="text-xs font-semibold text-indigo-600 uppercase">Predicted Price</span>
+              <div class="text-2xl font-black text-indigo-900 mt-1" id="res-predicted-val">-</div>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs font-medium text-slate-400 uppercase">Last Close</span>
+              <div class="text-xl font-bold text-slate-800 mt-1" id="res-last-close">-</div>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs font-medium text-slate-400 uppercase">Expected Change</span>
+              <div class="text-xl font-bold mt-1" id="res-change">-</div>
+            </div>
+            <div class="p-4 bg-slate-50 rounded-xl border border-slate-100">
+              <span class="text-xs font-medium text-slate-400 uppercase">Expected Return</span>
+              <div class="text-xl font-bold mt-1" id="res-pct">-</div>
+            </div>
+          </div>
+
+          <!-- Plotly Chart: Next-day forecast -->
+          <div class="border border-slate-100 rounded-xl p-4 bg-slate-50/30">
+            <h4 class="text-sm font-bold text-slate-800 mb-2">Price Trajectory & Forecast Target Point</h4>
+            <div id="live-predict-chart" class="w-full h-80"></div>
+          </div>
+        </div>
+
+        <div id="prediction-placeholder" class="bg-white p-12 rounded-2xl border border-slate-200 shadow-sm text-center">
+          <div class="w-16 h-16 bg-indigo-50 text-indigo-600 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          </div>
+          <h3 class="text-lg font-bold text-slate-800">Select a Saved Model to Begin</h3>
+          <p class="text-slate-500 text-sm mt-1 max-w-sm mx-auto">Choose a pre-trained model from the dropdown list to load live predictions, post-save evaluation, and strategy monitoring.</p>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- Section: Side-by-Side Metrics Comparison (Training vs Post-Save) -->
+    <div id="metrics-comparison-container" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 hidden">
+      <h3 class="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+        <span>Performance Comparison: Training Snapshot vs Post-Save Live Monitoring</span>
+        <span class="text-xs font-normal text-slate-400">Strict Leakage-Free Evaluation Boundary</span>
+      </h3>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Original Training Performance -->
+        <div class="bg-slate-50 p-5 rounded-xl border border-slate-200">
+          <span class="text-xs uppercase font-extrabold tracking-wider text-slate-400 block mb-3">Original Training-Time Snapshot</span>
+          <div class="grid grid-cols-2 gap-4 text-xs">
+            <div><span class="text-slate-500">Test RMSE:</span><strong class="block text-sm text-slate-800 font-bold" id="comp-train-rmse">-</strong></div>
+            <div><span class="text-slate-500">Test MAE:</span><strong class="block text-sm text-slate-800 font-bold" id="comp-train-mae">-</strong></div>
+            <div><span class="text-slate-500">Dir. Accuracy:</span><strong class="block text-sm text-emerald-600 font-bold" id="comp-train-da">-</strong></div>
+            <div><span class="text-slate-500">Strategy Return:</span><strong class="block text-sm text-indigo-600 font-bold" id="comp-train-strat-ret">-</strong></div>
+            <div><span class="text-slate-500">Win Rate:</span><strong class="block text-sm text-slate-800 font-bold" id="comp-train-winrate">-</strong></div>
+            <div><span class="text-slate-500">Sharpe Ratio:</span><strong class="block text-sm text-slate-800 font-bold" id="comp-train-sharpe">-</strong></div>
+          </div>
+        </div>
+
+        <!-- Live Post-Save Performance -->
+        <div class="bg-indigo-50/40 p-5 rounded-xl border border-indigo-100">
+          <span class="text-xs uppercase font-extrabold tracking-wider text-indigo-600 block mb-3">Post-Save Performance (Live Unseen Data)</span>
+          <div class="grid grid-cols-2 gap-4 text-xs">
+            <div><span class="text-slate-500">Live Samples:</span><strong class="block text-sm text-slate-800 font-bold" id="comp-live-samples">0</strong></div>
+            <div><span class="text-slate-500">Live RMSE:</span><strong class="block text-sm text-indigo-600 font-bold" id="comp-live-rmse">-</strong></div>
+            <div><span class="text-slate-500">Live Dir. Acc.:</span><strong class="block text-sm text-emerald-600 font-bold" id="comp-live-da">-</strong></div>
+            <div><span class="text-slate-500">Live Strat Return:</span><strong class="block text-sm text-indigo-600 font-bold" id="comp-live-strat-ret">-</strong></div>
+            <div><span class="text-slate-500">Live Win Rate:</span><strong class="block text-sm text-slate-800 font-bold" id="comp-live-winrate">-</strong></div>
+            <div><span class="text-slate-500">Live Max Drawdown:</span><strong class="block text-sm text-pink-600 font-bold" id="comp-live-drawdown">-</strong></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Graph #1: Actual vs Predicted Price Since Model Saved -->
+    <div id="post-save-chart-card" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 hidden">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">Graph #1 — Actual vs Predicted Price Since Model Was Saved</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Evaluates how predictions compare to actual prices strictly after the training cutoff</p>
+        </div>
+      </div>
+      <div id="post-save-actual-chart" class="w-full h-96"></div>
+      <div id="post-save-actual-empty" class="text-center py-8 text-slate-400 hidden">Not enough post-save market data available yet.</div>
+    </div>
+
+    <!-- Graph #2: Post-Save Trading Strategy & Summary -->
+    <div id="post-save-strategy-card" class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8 hidden">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="text-lg font-bold text-slate-900">Graph #2 — Trading Strategy Performance Since Model Was Saved</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Executes EMA filter + model prediction signals exclusively on post-save unseen observations</p>
+        </div>
+      </div>
+      <div id="post-save-strategy-chart" class="w-full h-96 mb-6"></div>
+      <div id="post-save-strategy-empty" class="text-center py-8 text-slate-400 hidden">Not enough post-save observations to calculate trading strategy metrics.</div>
+
+      <!-- Strategy Summary Cards -->
+      <div id="post-save-strat-metrics-box" class="pt-4 border-t border-slate-100 hidden">
+        <h4 class="text-sm font-bold text-slate-800 mb-3">Strategy Performance Summary (Post-Save Period)</h4>
+        <div class="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3 text-xs">
+          <div class="p-3 bg-slate-50 rounded-xl"><span class="text-slate-400 block">Total Return</span><strong id="pss-return" class="text-sm font-bold text-emerald-600 mt-0.5 block">-</strong></div>
+          <div class="p-3 bg-slate-50 rounded-xl"><span class="text-slate-400 block">Buy & Hold Return</span><strong id="pss-bh" class="text-sm font-bold text-slate-700 mt-0.5 block">-</strong></div>
+          <div class="p-3 bg-slate-50 rounded-xl"><span class="text-slate-400 block">Total Trades</span><strong id="pss-trades" class="text-sm font-bold text-slate-800 mt-0.5 block">-</strong></div>
+          <div class="p-3 bg-slate-50 rounded-xl"><span class="text-slate-400 block">Win Rate</span><strong id="pss-winrate" class="text-sm font-bold text-slate-800 mt-0.5 block">-</strong></div>
+          <div class="p-3 bg-slate-50 rounded-xl"><span class="text-slate-400 block">Sharpe Ratio</span><strong id="pss-sharpe" class="text-sm font-bold text-indigo-600 mt-0.5 block">-</strong></div>
+          <div class="p-3 bg-slate-50 rounded-xl"><span class="text-slate-400 block">Max Drawdown</span><strong id="pss-drawdown" class="text-sm font-bold text-pink-600 mt-0.5 block">-</strong></div>
+          <div class="p-3 bg-slate-50 rounded-xl"><span class="text-slate-400 block">Current Position</span><strong id="pss-position" class="text-sm font-bold text-slate-800 mt-0.5 block">-</strong></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Chronological Prediction History Table -->
+    <div id="prediction-history-card" class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden hidden">
+      <div class="p-6 border-b border-slate-100">
+        <h3 class="text-lg font-bold text-slate-900">Prediction History</h3>
+        <p class="text-xs text-slate-500 mt-0.5">Complete record of zero-retrain predictions recorded for this model</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-sm">
+          <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+            <tr>
+              <th class="py-3 px-4">Prediction Date</th>
+              <th class="py-3 px-4">Input Date</th>
+              <th class="py-3 px-4">Predicted Value</th>
+              <th class="py-3 px-4">Actual Value</th>
+              <th class="py-3 px-4">Error</th>
+              <th class="py-3 px-4">Direction</th>
+              <th class="py-3 px-4">Created At</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            <tr><td colspan="7" class="text-center py-6 text-slate-400">No predictions recorded yet.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    let savedModels = [];
+    let selectedModelId = null;
+
+    const selectEl = document.getElementById("select-model");
+    const specsEl = document.getElementById("selected-model-specs");
+    const alertBox = document.getElementById("predict-alert");
+
+    async function init() {
+      try {
+        const response = await fetch("/api/models");
+        savedModels = await response.json();
+
+        if (savedModels.length === 0) {
+          selectEl.innerHTML = '<option value="">No saved models available</option>';
+          return;
+        }
+
+        selectEl.innerHTML = '<option value="">-- Select a Saved Model --</option>' +
+          savedModels.map(m => `<option value="${m.id}">${m.name} (${m.symbol} - ${m.model_type})</option>`).join("");
+
+        const urlParams = new URLSearchParams(window.location.search);
+        const preselect = urlParams.get("model_id");
+        if (preselect) {
+          selectEl.value = preselect;
+          onSelectModel(preselect);
+        }
+      } catch (err) {
+        showAlert("Failed to load saved models: " + err.message, "danger");
+      }
+    }
+
+    selectEl.addEventListener("change", (e) => {
+      onSelectModel(e.target.value);
+    });
+
+    function onSelectModel(modelId) {
+      selectedModelId = modelId;
+      if (!modelId) {
+        specsEl.classList.add("hidden");
+        document.getElementById("prediction-result-card").classList.add("hidden");
+        document.getElementById("current-signal-card").classList.add("hidden");
+        document.getElementById("metrics-comparison-container").classList.add("hidden");
+        document.getElementById("post-save-chart-card").classList.add("hidden");
+        document.getElementById("post-save-strategy-card").classList.add("hidden");
+        document.getElementById("prediction-history-card").classList.add("hidden");
+        document.getElementById("prediction-placeholder").classList.remove("hidden");
+        return;
+      }
+
+      const m = savedModels.find(item => item.id === modelId);
+      if (!m) return;
+
+      document.getElementById("spec-name").textContent = m.name;
+      document.getElementById("spec-type").textContent = m.model_type;
+      document.getElementById("spec-symbol").textContent = m.symbol;
+      document.getElementById("spec-exchange").textContent = m.exchange;
+      document.getElementById("spec-timestep").textContent = `${m.timestep} bars`;
+      document.getElementById("spec-rmse").textContent = m.metrics?.RMSE != null ? Number(m.metrics.RMSE).toFixed(4) : "-";
+      document.getElementById("spec-da").textContent = m.metrics?.["Directional Accuracy (%)"] != null ? Number(m.metrics["Directional Accuracy (%)"]).toFixed(2) + "%" : "-";
+
+      specsEl.classList.remove("hidden");
+
+      // Auto trigger live prediction / monitoring load
+      triggerLivePrediction();
+    }
+
+    document.getElementById("btn-run-predict").addEventListener("click", () => {
+      triggerLivePrediction();
+    });
+
+    async function triggerLivePrediction() {
+      if (!selectedModelId) return;
+
+      const btn = document.getElementById("btn-run-predict");
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status"></span> Fetching Market Data...';
+      hideAlert();
+
+      try {
+        const response = await fetch(`/api/models/${selectedModelId}/predict`, { method: "POST" });
+        if (!response.ok) {
+          const errData = await response.json();
+          throw new Error(errData.detail || "Prediction failed.");
+        }
+        const data = await response.json();
+        renderMonitoringDashboard(data);
+      } catch (err) {
+        showAlert("Monitoring Error: " + err.message, "danger");
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg> Generate Live Prediction';
+      }
+    }
+
+    function renderMonitoringDashboard(res) {
+      document.getElementById("prediction-placeholder").classList.add("hidden");
+      document.getElementById("prediction-result-card").classList.remove("hidden");
+      document.getElementById("current-signal-card").classList.remove("hidden");
+      document.getElementById("metrics-comparison-container").classList.remove("hidden");
+      document.getElementById("post-save-chart-card").classList.remove("hidden");
+      document.getElementById("post-save-strategy-card").classList.remove("hidden");
+      document.getElementById("prediction-history-card").classList.remove("hidden");
+
+      // Next-Day Prediction
+      document.getElementById("res-target-date").textContent = res.prediction_date;
+      document.getElementById("res-input-date").textContent = res.input_data_timestamp;
+      document.getElementById("res-predicted-val").textContent = "$" + res.predicted_value.toFixed(2);
+      document.getElementById("res-last-close").textContent = "$" + res.last_close.toFixed(2);
+
+      const changeEl = document.getElementById("res-change");
+      const pctEl = document.getElementById("res-pct");
+
+      const isUp = res.predicted_change >= 0;
+      const sign = isUp ? "+" : "";
+      const colorClass = isUp ? "text-emerald-600" : "text-pink-600";
+
+      changeEl.className = `text-xl font-bold mt-1 ${colorClass}`;
+      changeEl.textContent = `${sign}$${res.predicted_change.toFixed(2)}`;
+
+      pctEl.className = `text-xl font-bold mt-1 ${colorClass}`;
+      pctEl.textContent = `${sign}${res.predicted_change_pct.toFixed(2)}%`;
+
+      if (res.figure && window.Plotly) {
+        Plotly.react("live-predict-chart", res.figure.data, res.figure.layout, { responsive: true });
+      }
+
+      // Current Signal Badge
+      const sig = res.current_signal || {};
+      const sigBadge = document.getElementById("signal-badge");
+      sigBadge.textContent = sig.signal || "HOLD";
+      if (sig.signal === "BUY") {
+        sigBadge.className = "px-3 py-1 text-sm font-black rounded-lg bg-emerald-100 text-emerald-800 border border-emerald-300";
+      } else if (sig.signal === "CLOSE") {
+        sigBadge.className = "px-3 py-1 text-sm font-black rounded-lg bg-pink-100 text-pink-800 border border-pink-300";
+      } else {
+        sigBadge.className = "px-3 py-1 text-sm font-black rounded-lg bg-amber-100 text-amber-800 border border-amber-300";
+      }
+
+      document.getElementById("signal-position").textContent = sig.position_status || "-";
+      document.getElementById("signal-rationale").textContent = sig.rationale || "-";
+      document.getElementById("sig-pred-val").textContent = sig.predicted_value != null ? `$${sig.predicted_value.toFixed(2)}` : "-";
+      document.getElementById("sig-ema-val").textContent = sig.ema_filter != null ? `$${sig.ema_filter.toFixed(2)}` : "-";
+
+      // Metrics Comparison (Training Snapshot vs Post-Save Live)
+      const snap = res.training_snapshot || {};
+      const best = snap.best_model || {};
+      const tMet = best.metrics || {};
+      const tStrat = snap.strategy?.metrics || {};
+
+      document.getElementById("comp-train-rmse").textContent = tMet.RMSE != null ? Number(tMet.RMSE).toFixed(4) : "-";
+      document.getElementById("comp-train-mae").textContent = tMet.MAE != null ? Number(tMet.MAE).toFixed(4) : "-";
+      document.getElementById("comp-train-da").textContent = tMet["Directional Accuracy (%)"] != null ? Number(tMet["Directional Accuracy (%)"]).toFixed(2) + "%" : "-";
+      document.getElementById("comp-train-strat-ret").textContent = tStrat.strategy_total_return_pct != null ? Number(tStrat.strategy_total_return_pct).toFixed(2) + "%" : "-";
+      document.getElementById("comp-train-winrate").textContent = tStrat.win_rate_pct != null ? Number(tStrat.win_rate_pct).toFixed(2) + "%" : "-";
+      document.getElementById("comp-train-sharpe").textContent = tStrat.sharpe_ratio != null ? Number(tStrat.sharpe_ratio).toFixed(2) : "-";
+
+      const psPreds = res.post_save_predictions || {};
+      const lMet = psPreds.metrics || {};
+      const psStrat = res.post_save_strategy || {};
+      const lStrat = psStrat.metrics || {};
+
+      document.getElementById("comp-live-samples").textContent = psPreds.post_save_samples || 0;
+      document.getElementById("comp-live-rmse").textContent = lMet.RMSE != null ? Number(lMet.RMSE).toFixed(4) : "-";
+      document.getElementById("comp-live-da").textContent = lMet["Directional Accuracy (%)"] != null ? Number(lMet["Directional Accuracy (%)"]).toFixed(2) + "%" : "-";
+      document.getElementById("comp-live-strat-ret").textContent = lStrat.strategy_total_return_pct != null ? Number(lStrat.strategy_total_return_pct).toFixed(2) + "%" : "-";
+      document.getElementById("comp-live-winrate").textContent = lStrat.win_rate_pct != null ? Number(lStrat.win_rate_pct).toFixed(2) + "%" : "-";
+      document.getElementById("comp-live-drawdown").textContent = lStrat.max_drawdown_pct != null ? Number(lStrat.max_drawdown_pct).toFixed(2) + "%" : "-";
+
+      // Graph #1: Post-Save Actual vs Predicted
+      const chart1Card = document.getElementById("post-save-actual-chart");
+      const chart1Empty = document.getElementById("post-save-actual-empty");
+      if (psPreds.has_data && psPreds.figure && window.Plotly) {
+        chart1Card.classList.remove("hidden");
+        chart1Empty.classList.add("hidden");
+        Plotly.react("post-save-actual-chart", psPreds.figure.data, psPreds.figure.layout, { responsive: true });
+      } else {
+        chart1Card.classList.add("hidden");
+        chart1Empty.classList.remove("hidden");
+        chart1Empty.textContent = psPreds.message || "Not enough post-save market data available yet.";
+      }
+
+      // Graph #2: Post-Save Strategy
+      const chart2Card = document.getElementById("post-save-strategy-chart");
+      const chart2Empty = document.getElementById("post-save-strategy-empty");
+      const stratBox = document.getElementById("post-save-strat-metrics-box");
+
+      if (psStrat.has_data && psStrat.figure && window.Plotly) {
+        chart2Card.classList.remove("hidden");
+        chart2Empty.classList.add("hidden");
+        stratBox.classList.remove("hidden");
+
+        Plotly.react("post-save-strategy-chart", psStrat.figure.data, psStrat.figure.layout, { responsive: true });
+
+        document.getElementById("pss-return").textContent = lStrat.strategy_total_return_pct != null ? Number(lStrat.strategy_total_return_pct).toFixed(2) + "%" : "-";
+        document.getElementById("pss-bh").textContent = lStrat.buy_hold_return_pct != null ? Number(lStrat.buy_hold_return_pct).toFixed(2) + "%" : "-";
+        document.getElementById("pss-trades").textContent = lStrat.total_trades != null ? lStrat.total_trades : "-";
+        document.getElementById("pss-winrate").textContent = lStrat.win_rate_pct != null ? Number(lStrat.win_rate_pct).toFixed(2) + "%" : "-";
+        document.getElementById("pss-sharpe").textContent = lStrat.sharpe_ratio != null ? Number(lStrat.sharpe_ratio).toFixed(2) : "-";
+        document.getElementById("pss-drawdown").textContent = lStrat.max_drawdown_pct != null ? Number(lStrat.max_drawdown_pct).toFixed(2) + "%" : "-";
+        document.getElementById("pss-position").textContent = lStrat.current_position || "-";
+      } else {
+        chart2Card.classList.add("hidden");
+        stratBox.classList.add("hidden");
+        chart2Empty.classList.remove("hidden");
+        chart2Empty.textContent = psStrat.message || "Not enough post-save observations to calculate trading strategy metrics.";
+      }
+
+      // Prediction History Table
+      const tbody = document.getElementById("history-table-body");
+      const preds = res.predictions_history || [];
+
+      if (preds.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400">No predictions recorded yet.</td></tr>';
+      } else {
+        tbody.innerHTML = preds.map(p => `
+          <tr>
+            <td class="py-3 px-4 font-semibold text-slate-800">${p.prediction_date}</td>
+            <td class="py-3 px-4 text-slate-500">${p.input_data_timestamp}</td>
+            <td class="py-3 px-4 font-bold text-indigo-600">$${Number(p.predicted_value).toFixed(2)}</td>
+            <td class="py-3 px-4 font-semibold text-slate-700">${p.actual_value != null ? '$' + Number(p.actual_value).toFixed(2) : '-'}</td>
+            <td class="py-3 px-4 text-slate-600">${p.error != null ? Number(p.error).toFixed(2) : '-'}</td>
+            <td class="py-3 px-4">${p.direction_correct === 1 ? '<span class="text-emerald-600 font-bold">✓ Correct</span>' : p.direction_correct === 0 ? '<span class="text-pink-600 font-bold">✗ Incorrect</span>' : '-'}</td>
+            <td class="py-3 px-4 text-xs text-slate-400">${new Date(p.created_at).toLocaleString()}</td>
+          </tr>
+        `).join("");
+      }
+    }
+
+    function showAlert(msg, kind) {
+      alertBox.className = `alert alert-${kind} mb-6`;
+      alertBox.textContent = msg;
+      alertBox.classList.remove("d-none");
+    }
+
+    function hideAlert() {
+      alertBox.classList.add("d-none");
+    }
+
+    document.addEventListener("DOMContentLoaded", init);
+  </script>
+</body>
+</html>

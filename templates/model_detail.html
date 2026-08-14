@@ -1,0 +1,321 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Model Details — Stock Prediction Lab</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+  <link href="/static/styles.css?v=4" rel="stylesheet">
+  <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
+</head>
+<body class="bg-slate-50 text-slate-900 font-sans min-h-screen">
+  
+  {% include 'nav.html' %}
+
+  <div class="max-w-7xl mx-auto py-8 px-6">
+    
+    <!-- Top Action Header -->
+    <div class="flex flex-wrap items-center justify-between gap-4 mb-6">
+      <div class="flex items-center gap-3">
+        <a href="/models" class="text-slate-400 hover:text-slate-600 transition-colors">
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+        </a>
+        <div>
+          <div class="flex items-center gap-2">
+            <h1 class="text-2xl font-bold text-slate-900 mb-0" id="detail-title">Loading Model...</h1>
+            <span id="detail-status-badge" class="px-2.5 py-0.5 text-xs font-bold rounded-full bg-slate-100 text-slate-600">Active</span>
+          </div>
+          <p class="text-slate-500 text-sm mt-0.5" id="detail-subtitle">Complete Saved Model Experiment Snapshot & Live Monitoring</p>
+        </div>
+      </div>
+
+      <div class="flex flex-wrap items-center gap-2">
+        <button id="btn-predict-now" class="btn bg-indigo-600 text-white hover:bg-indigo-700 font-medium px-4 py-2 rounded-xl text-sm flex items-center gap-2 shadow-sm">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          Open Live Dashboard
+        </button>
+        <button id="btn-retrain" class="btn btn-light border text-slate-700 hover:bg-slate-100 font-medium px-4 py-2 rounded-xl text-sm flex items-center gap-2">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21.5 2v6h-6M21.34 15.57a10 10 0 1 1-.57-8.38l5.67-5.67"></path></svg>
+          Retrain Model
+        </button>
+        <button id="btn-toggle-autoupdate" class="btn btn-light border text-slate-700 hover:bg-slate-100 font-medium px-4 py-2 rounded-xl text-sm">
+          Auto-Update: Off
+        </button>
+      </div>
+    </div>
+
+    <!-- Alert status -->
+    <div id="detail-alert" class="alert alert-info d-none mb-6" role="alert"></div>
+
+    <!-- Section 1: Overview Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+      
+      <!-- Card 1: Configuration & Dataset Summary -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 class="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center gap-2">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="indigo" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></circle></svg>
+          Dataset & Model Specs
+        </h3>
+        <dl class="grid grid-cols-2 gap-4 text-xs">
+          <div><dt class="text-slate-400 font-medium">Stock Symbol</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="cfg-symbol">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Exchange</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="cfg-exchange">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Model Type</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="cfg-type">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Timestep</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="cfg-timestep">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Train Split</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="cfg-split">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Total Rows</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="cfg-total-rows">-</dd></div>
+          <div class="col-span-2"><dt class="text-slate-400 font-medium">Training Data Boundary</dt><dd class="font-medium text-slate-700 text-xs mt-0.5" id="cfg-range">-</dd></div>
+        </dl>
+      </div>
+
+      <!-- Card 2: Training-Time Model Metrics -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 mb-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="indigo" stroke-width="2"><path d="M18 20V10"></path><path d="M12 20V4"></path><path d="M6 20v-6"></path></svg>
+            Original Training Performance
+          </h3>
+          <span class="px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider bg-slate-100 text-slate-600 rounded">Historical</span>
+        </div>
+        <dl class="grid grid-cols-2 gap-4 text-xs">
+          <div><dt class="text-slate-400 font-medium">Test RMSE</dt><dd class="font-bold text-indigo-600 text-base mt-0.5" id="m-rmse">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Test MAE</dt><dd class="font-bold text-slate-800 text-base mt-0.5" id="m-mae">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Test MAPE</dt><dd class="font-bold text-slate-800 text-base mt-0.5" id="m-mape">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Dir. Accuracy</dt><dd class="font-bold text-emerald-600 text-base mt-0.5" id="m-da">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">R² Score</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="m-r2">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Training Time</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="m-time">-</dd></div>
+        </dl>
+      </div>
+
+      <!-- Card 3: Post-Save Live Performance -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm border-l-4 border-l-emerald-500">
+        <div class="flex items-center justify-between mb-4 pb-2 border-b border-slate-100">
+          <h3 class="text-base font-bold text-slate-900 flex items-center gap-2 mb-0">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#059669" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline></svg>
+            Live Performance (Post-Save)
+          </h3>
+          <span class="px-2 py-0.5 text-[10px] uppercase font-bold tracking-wider bg-emerald-100 text-emerald-700 rounded">Unseen</span>
+        </div>
+        <dl class="grid grid-cols-2 gap-4 text-xs">
+          <div><dt class="text-slate-400 font-medium">Live Samples</dt><dd class="font-bold text-slate-800 text-base mt-0.5" id="lm-samples">0</dd></div>
+          <div><dt class="text-slate-400 font-medium">Live RMSE</dt><dd class="font-bold text-indigo-600 text-base mt-0.5" id="lm-rmse">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Live MAE</dt><dd class="font-bold text-slate-800 text-base mt-0.5" id="lm-mae">-</dd></div>
+          <div><dt class="text-slate-400 font-medium">Live Dir. Acc.</dt><dd class="font-bold text-emerald-600 text-base mt-0.5" id="lm-da">-</dd></div>
+        </dl>
+      </div>
+    </div>
+
+    <!-- Section 2: Detailed Training Snapshot Cards -->
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      
+      <!-- Card: Training-Time Strategy Summary -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 class="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+          <span>Original Training Strategy Performance</span>
+          <span class="text-xs font-normal text-slate-400">Training-Time Snapshot</span>
+        </h3>
+        <dl class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+          <div><dt class="text-slate-400">Strategy Return</dt><dd class="font-bold text-emerald-600 text-sm mt-0.5" id="ts-return">-</dd></div>
+          <div><dt class="text-slate-400">Buy & Hold Return</dt><dd class="font-bold text-slate-700 text-sm mt-0.5" id="ts-bh">-</dd></div>
+          <div><dt class="text-slate-400">Win Rate</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="ts-winrate">-</dd></div>
+          <div><dt class="text-slate-400">Sharpe Ratio</dt><dd class="font-bold text-indigo-600 text-sm mt-0.5" id="ts-sharpe">-</dd></div>
+          <div><dt class="text-slate-400">Max Drawdown</dt><dd class="font-bold text-pink-600 text-sm mt-0.5" id="ts-drawdown">-</dd></div>
+          <div><dt class="text-slate-400">Total Trades</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="ts-trades">-</dd></div>
+        </dl>
+      </div>
+
+      <!-- Card: Saved Walk-Forward & Forecast Config -->
+      <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm">
+        <h3 class="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+          <span>Walk-Forward & Experiment Metadata</span>
+          <span class="text-xs font-normal text-slate-400">Training-Time Snapshot</span>
+        </h3>
+        <dl class="grid grid-cols-2 sm:grid-cols-3 gap-4 text-xs">
+          <div><dt class="text-slate-400">Walk-Forward Days</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="wf-days">-</dd></div>
+          <div><dt class="text-slate-400">Forecast Days</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="wf-forecast">-</dd></div>
+          <div><dt class="text-slate-400">EMA Filter Period</dt><dd class="font-bold text-slate-800 text-sm mt-0.5" id="wf-ema">-</dd></div>
+          <div class="col-span-2"><dt class="text-slate-400">Walk-Forward RMSE</dt><dd class="font-bold text-indigo-600 text-sm mt-0.5" id="wf-rmse">-</dd></div>
+        </dl>
+      </div>
+
+    </div>
+
+    <!-- Chart: Predicted vs Actual Live Data -->
+    <div class="bg-white p-6 rounded-2xl border border-slate-200 shadow-sm mb-8">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h2 class="text-lg font-bold text-slate-900">Predicted vs Actual (Live Unseen Data)</h2>
+          <p class="text-xs text-slate-500">Evaluation on fresh market observations post-training</p>
+        </div>
+      </div>
+      <div id="live-detail-chart" class="w-full h-96"></div>
+    </div>
+
+    <!-- Prediction History Table -->
+    <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+      <div class="p-6 border-b border-slate-100">
+        <h2 class="text-lg font-bold text-slate-900">Prediction History</h2>
+        <p class="text-xs text-slate-500 mt-0.5">Chronological record of generated forecasts</p>
+      </div>
+      <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0 text-sm">
+          <thead class="bg-slate-50 text-slate-500 uppercase text-xs">
+            <tr>
+              <th class="py-3 px-4">Prediction Date</th>
+              <th class="py-3 px-4">Input Date</th>
+              <th class="py-3 px-4">Predicted Value</th>
+              <th class="py-3 px-4">Actual Value</th>
+              <th class="py-3 px-4">Error</th>
+              <th class="py-3 px-4">Direction</th>
+              <th class="py-3 px-4">Created At</th>
+            </tr>
+          </thead>
+          <tbody id="history-table-body">
+            <tr><td colspan="7" class="text-center py-6 text-slate-400">No predictions recorded yet. Click "Open Live Dashboard" to generate predictions.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+  </div>
+
+  <script>
+    const modelId = window.location.pathname.split("/").pop();
+    let currentModel = null;
+
+    async function loadModelDetails() {
+      try {
+        const response = await fetch(`/api/models/${modelId}`);
+        if (!response.ok) throw new Error("Model not found");
+        currentModel = await response.json();
+        renderDetails(currentModel);
+      } catch (err) {
+        document.getElementById("detail-alert").className = "alert alert-danger mb-6";
+        document.getElementById("detail-alert").textContent = err.message;
+        document.getElementById("detail-alert").classList.remove("d-none");
+      }
+    }
+
+    function renderDetails(m) {
+      document.getElementById("detail-title").textContent = m.name;
+      document.getElementById("detail-subtitle").textContent = `${m.symbol} (${m.exchange}) · ${m.model_type} · Version ${m.version || 1}`;
+      
+      const badge = document.getElementById("detail-status-badge");
+      badge.textContent = m.status || (m.is_active ? "Active" : "Inactive");
+      badge.className = `px-2.5 py-0.5 text-xs font-bold rounded-full ${m.is_active ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-slate-100 text-slate-600'}`;
+
+      document.getElementById("btn-toggle-autoupdate").textContent = `Auto-Update: ${m.auto_update ? 'ON' : 'OFF'}`;
+
+      // Config
+      document.getElementById("cfg-symbol").textContent = m.symbol;
+      document.getElementById("cfg-exchange").textContent = m.exchange;
+      document.getElementById("cfg-type").textContent = m.model_type;
+      document.getElementById("cfg-timestep").textContent = `${m.timestep} bars`;
+      document.getElementById("cfg-split").textContent = `${((m.train_split || 0.8) * 100).toFixed(0)}% / ${((1 - (m.train_split || 0.8)) * 100).toFixed(0)}%`;
+      document.getElementById("cfg-range").textContent = `${m.train_start || '-'} → ${m.train_end || '-'}`;
+
+      // Training Snapshot Data
+      const snap = m.training_snapshot || {};
+      const ds = snap.dataset_summary || {};
+      document.getElementById("cfg-total-rows").textContent = ds.total_rows != null ? ds.total_rows : "-";
+
+      // Training Metrics
+      const met = m.metrics || {};
+      document.getElementById("m-rmse").textContent = met.RMSE != null ? Number(met.RMSE).toFixed(4) : "-";
+      document.getElementById("m-mae").textContent = met.MAE != null ? Number(met.MAE).toFixed(4) : "-";
+      document.getElementById("m-mape").textContent = met.MAPE != null ? Number(met.MAPE).toFixed(2) + "%" : "-";
+      document.getElementById("m-da").textContent = met["Directional Accuracy (%)"] != null ? Number(met["Directional Accuracy (%)"]).toFixed(2) + "%" : "-";
+      document.getElementById("m-r2").textContent = met["R2"] != null ? Number(met["R2"]).toFixed(4) : "-";
+      document.getElementById("m-time").textContent = met["Training Time (s)"] != null ? Number(met["Training Time (s)"]).toFixed(2) + "s" : "-";
+
+      // Live Post-Save Metrics
+      const live = m.post_save_predictions || {};
+      if (live.has_data && live.metrics) {
+        document.getElementById("lm-samples").textContent = live.post_save_samples || 0;
+        document.getElementById("lm-rmse").textContent = live.metrics.RMSE != null ? Number(live.metrics.RMSE).toFixed(4) : "-";
+        document.getElementById("lm-mae").textContent = live.metrics.MAE != null ? Number(live.metrics.MAE).toFixed(4) : "-";
+        document.getElementById("lm-da").textContent = live.metrics["Directional Accuracy (%)"] != null ? Number(live.metrics["Directional Accuracy (%)"]).toFixed(2) + "%" : "-";
+      } else {
+        document.getElementById("lm-samples").textContent = "0";
+        document.getElementById("lm-rmse").textContent = "-";
+        document.getElementById("lm-mae").textContent = "-";
+        document.getElementById("lm-da").textContent = "-";
+      }
+
+      // Snapshot Strategy Summary
+      const strat = snap.strategy || {};
+      const smet = strat.metrics || {};
+      document.getElementById("ts-return").textContent = smet.strategy_total_return_pct != null ? Number(smet.strategy_total_return_pct).toFixed(2) + "%" : "-";
+      document.getElementById("ts-bh").textContent = smet.buy_hold_return_pct != null ? Number(smet.buy_hold_return_pct).toFixed(2) + "%" : "-";
+      document.getElementById("ts-winrate").textContent = smet.win_rate_pct != null ? Number(smet.win_rate_pct).toFixed(2) + "%" : "-";
+      document.getElementById("ts-sharpe").textContent = smet.sharpe_ratio != null ? Number(smet.sharpe_ratio).toFixed(2) : "-";
+      document.getElementById("ts-drawdown").textContent = smet.max_drawdown_pct != null ? Number(smet.max_drawdown_pct).toFixed(2) + "%" : "-";
+      document.getElementById("ts-trades").textContent = smet.total_trades != null ? smet.total_trades : "-";
+
+      // Snapshot Walk-Forward & Config
+      const snapCfg = snap.config || {};
+      document.getElementById("wf-days").textContent = snapCfg.walk_forward_days != null ? `${snapCfg.walk_forward_days} days` : "-";
+      document.getElementById("wf-forecast").textContent = snapCfg.forecast_days != null ? `${snapCfg.forecast_days} days` : "-";
+      document.getElementById("wf-ema").textContent = snapCfg.ema_period != null ? `${snapCfg.ema_period} bars` : "-";
+
+      const wf = snap.walk_forward || {};
+      const wfTable = wf.table || [];
+      const modelWf = wfTable.find(r => r.Model === m.model_type) || {};
+      document.getElementById("wf-rmse").textContent = modelWf.RMSE != null ? Number(modelWf.RMSE).toFixed(4) : "N/A";
+
+      // Live Detail Chart
+      if (live.figure && window.Plotly) {
+        Plotly.react("live-detail-chart", live.figure.data, live.figure.layout, { responsive: true });
+      }
+
+      // Predictions table
+      const tbody = document.getElementById("history-table-body");
+      const preds = m.predictions || [];
+
+      if (preds.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="7" class="text-center py-6 text-slate-400">No predictions recorded yet. Click "Open Live Dashboard" to generate predictions.</td></tr>';
+      } else {
+        tbody.innerHTML = preds.map(p => `
+          <tr>
+            <td class="py-3 px-4 font-semibold text-slate-800">${p.prediction_date}</td>
+            <td class="py-3 px-4 text-slate-500">${p.input_data_timestamp}</td>
+            <td class="py-3 px-4 font-bold text-indigo-600">$${Number(p.predicted_value).toFixed(2)}</td>
+            <td class="py-3 px-4 font-semibold text-slate-700">${p.actual_value != null ? '$' + Number(p.actual_value).toFixed(2) : '-'}</td>
+            <td class="py-3 px-4 text-slate-600">${p.error != null ? Number(p.error).toFixed(2) : '-'}</td>
+            <td class="py-3 px-4">${p.direction_correct === 1 ? '<span class="text-emerald-600 font-bold">✓ Correct</span>' : p.direction_correct === 0 ? '<span class="text-pink-600 font-bold">✗ Incorrect</span>' : '-'}</td>
+            <td class="py-3 px-4 text-xs text-slate-400">${new Date(p.created_at).toLocaleString()}</td>
+          </tr>
+        `).join("");
+      }
+    }
+
+    document.getElementById("btn-predict-now").addEventListener("click", () => {
+      window.location.href = `/predict?model_id=${modelId}`;
+    });
+
+    document.getElementById("btn-toggle-autoupdate").addEventListener("click", async () => {
+      if (!currentModel) return;
+      const targetState = currentModel.auto_update ? 0 : 1;
+      await fetch(`/api/models/${modelId}/toggle-autoupdate?auto_update=${targetState}`, { method: "POST" });
+      loadModelDetails();
+    });
+
+    document.getElementById("btn-retrain").addEventListener("click", async () => {
+      if (!confirm("Retrain model on fresh dataset? This will create a new version record.")) return;
+      try {
+        const res = await fetch(`/api/models/${modelId}/retrain`, { method: "POST" });
+        const data = await res.json();
+        alert(`Retraining started! New model version ID: ${data.model_id}`);
+        window.location.href = `/models/${data.model_id}`;
+      } catch (err) {
+        alert("Retrain failed: " + err.message);
+      }
+    });
+
+    document.addEventListener("DOMContentLoaded", loadModelDetails);
+  </script>
+</body>
+</html>

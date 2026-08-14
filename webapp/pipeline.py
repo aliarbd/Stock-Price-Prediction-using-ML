@@ -235,4 +235,8 @@ def run_pipeline(config: PipelineConfig, progress: ProgressCallback | None = Non
     }
 
     _emit(progress, "Complete", 100)
-    return result
+    return result, model_objects, scaler, {
+        "start": data.index[0].strftime("%Y-%m-%d"),
+        "end": data.index[-1].strftime("%Y-%m-%d"),
+        "train_split_end": data.index[train_size - 1].strftime("%Y-%m-%d"),
+    }

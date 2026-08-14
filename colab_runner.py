@@ -30,7 +30,8 @@ def run_analysis(
         random_seed=random_seed,
         selected_models=selected_models or MODEL_ORDER.copy(),
     )
-    return run_pipeline(config)
+    res = run_pipeline(config)
+    return res[0] if isinstance(res, tuple) else res
 
 
 if __name__ == "__main__":
