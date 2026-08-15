@@ -4,12 +4,20 @@ Model registry module managing CRUD operations and prediction history in SQLite.
 from __future__ import annotations
 
 import json
+import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 import numpy as np
 import pandas as pd
 
 from .db import get_db_connection
+
+
+def _finite_float_or_none(value: Any) -> Optional[float]:
+    if value is None:
+        return None
+    value = float(value)
+    return value if math.isfinite(value) else None
 
 
 def save_model_record(data: Dict[str, Any]) -> str:
@@ -180,6 +188,10 @@ def record_prediction(
     Insert a prediction entry and update model record latest prediction.
     Prevents duplicate predictions for the same (model_id, prediction_date).
     """
+    predicted_value = _finite_float_or_none(predicted_value)
+    if predicted_value is None:
+        raise ValueError("Model returned an invalid prediction value.")
+
     now_iso = datetime.utcnow().isoformat()
     with get_db_connection() as conn:
         cursor = conn.cursor()
@@ -268,7 +280,7 @@ def update_actual_values(model_id: str, df_latest: pd.DataFrame) -> Dict[str, An
                     actual = float(df_close.loc[p_date])
                     pred = float(p["predicted_value"])
                     err = abs(actual - pred)
-                    pct_err = (err / (abs(actual) + 1e-8)) * 100
+                    pct_err = None if abs(actual) <= 1e-9 else (err / abs(actual)) * 100
 
                     # Direction check
                     inp_date = str(p["input_data_timestamp"])[:10]
@@ -285,7 +297,14 @@ def update_actual_values(model_id: str, df_latest: pd.DataFrame) -> Dict[str, An
                         SET actual_value = ?, error = ?, percentage_error = ?, direction_correct = ?, status = 'evaluated', actual_available_at = ?
                         WHERE id = ?
                         """,
-                        (actual, err, pct_err, direction, now_iso, p["id"]),
+                        (
+                            _finite_float_or_none(actual),
+                            _finite_float_or_none(err),
+                            _finite_float_or_none(pct_err),
+                            direction,
+                            now_iso,
+                            p["id"],
+                        ),
                     )
 
             conn.commit()
@@ -325,16 +344,29 @@ def _compute_live_metrics(conn: Any, model_id: str) -> Dict[str, Any]:
     actuals = np.array([r["actual_value"] for r in eval_rows])
     dirs = [r["direction_correct"] for r in eval_rows if r["direction_correct"] is not None]
 
+    valid_mask = np.isfinite(actuals) & np.isfinite(preds)
+    actuals = actuals[valid_mask]
+    preds = preds[valid_mask]
+    if len(actuals) == 0:
+        return {
+            "live_samples": 0,
+            "live_rmse": None,
+            "live_mae": None,
+            "live_mape": None,
+            "live_directional_accuracy": None,
+        }
+
     mse = np.mean((actuals - preds) ** 2)
     rmse = float(np.sqrt(mse))
     mae = float(np.mean(np.abs(actuals - preds)))
-    mape = float(np.mean(np.abs((actuals - preds) / (actuals + 1e-8))) * 100)
+    mape_mask = np.abs(actuals) > 1e-9
+    mape = float(np.mean(np.abs((actuals[mape_mask] - preds[mape_mask]) / actuals[mape_mask])) * 100) if np.any(mape_mask) else None
     da = float(np.mean(dirs) * 100) if dirs else None
 
     return {
         "live_samples": len(eval_rows),
-        "live_rmse": round(rmse, 4),
-        "live_mae": round(mae, 4),
-        "live_mape": round(mape, 4),
-        "live_directional_accuracy": round(da, 2) if da is not None else None,
+        "live_rmse": round(rmse, 4) if _finite_float_or_none(rmse) is not None else None,
+        "live_mae": round(mae, 4) if _finite_float_or_none(mae) is not None else None,
+        "live_mape": round(mape, 4) if _finite_float_or_none(mape) is not None else None,
+        "live_directional_accuracy": round(da, 2) if _finite_float_or_none(da) is not None else None,
     }

@@ -9,6 +9,8 @@ Maintains strict dataset separation:
 from __future__ import annotations
 
 import json
+import logging
+import math
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -25,8 +27,19 @@ from .model_registry import (
     update_actual_values,
 )
 from .model_store import load_saved_model
+from .serialization import find_non_finite_values, sanitize_for_json
 from .strategy import build_strategy_frame
 from .visuals import build_strategy_signals_figure, figure_to_json
+
+logger = logging.getLogger(__name__)
+
+
+def _ensure_finite_prediction(value: float, model_id: str, model_type: str) -> float:
+    value = float(value)
+    if not math.isfinite(value):
+        logger.error("Invalid live prediction for model_id=%s model_type=%s: %r", model_id, model_type, value)
+        raise ValueError("Model returned an invalid prediction value.")
+    return value
 
 
 def _predict_single_step(
@@ -282,11 +295,11 @@ def _evaluate_live_strategy(
 
     ret_series = pd.Series(strat_returns)
     std_ret = ret_series.std()
-    sharpe = float((ret_series.mean() / std_ret) * np.sqrt(252)) if std_ret > 0 else 0.0
+    sharpe = float((ret_series.mean() / std_ret) * np.sqrt(252)) if len(ret_series) > 1 and std_ret > 0 else None
 
     peak = strat_df["Cum_Growth"].cummax()
     drawdown = (strat_df["Cum_Growth"] - peak) / peak
-    max_dd = float(drawdown.min() * 100.0) if not drawdown.empty else 0.0
+    max_dd = float(drawdown.min() * 100.0) if not drawdown.empty else None
 
     current_pos_str = "In Position (Long)" if strat_df["Signal"].iloc[-1] == 1 else "Cash (Neutral)"
 
@@ -294,9 +307,9 @@ def _evaluate_live_strategy(
         "total_days": len(strat_df),
         "strategy_total_return_pct": round(total_return_pct, 2),
         "buy_hold_return_pct": round(bh_return_pct, 2),
-        "win_rate_pct": round(win_rate, 2),
-        "sharpe_ratio": round(sharpe, 2),
-        "max_drawdown_pct": round(max_dd, 2),
+        "win_rate_pct": round(win_rate, 2) if total_trades > 0 else None,
+        "sharpe_ratio": round(sharpe, 2) if sharpe is not None and math.isfinite(sharpe) else None,
+        "max_drawdown_pct": round(max_dd, 2) if max_dd is not None and math.isfinite(max_dd) else None,
         "total_trades": total_trades,
         "winning_trades": winning_trades,
         "losing_trades": losing_trades,
@@ -456,7 +469,11 @@ def get_current_signal_analysis(model_id: str, df: pd.DataFrame, ema_period: int
     history = get_model_predictions(model_id, limit=50)
     has_live_records = any(str(h["prediction_date"])[:10] > live_boundary for h in history) if live_boundary else len(history) > 0
 
-    predicted_val = _predict_single_step(model_obj, scaler_obj, model_type, df["close"], timestep)
+    predicted_val = _ensure_finite_prediction(
+        _predict_single_step(model_obj, scaler_obj, model_type, df["close"], timestep),
+        model_id,
+        model_type,
+    )
 
     ema_series = df["close"].ewm(span=ema_period, adjust=False).mean()
     latest_ema = float(ema_series.iloc[-1])
@@ -531,7 +548,11 @@ def run_live_prediction(model_id: str) -> Dict[str, Any]:
     last_close_val = float(df["close"].iloc[-1])
 
     # 3. Generate 1-step prediction for next target date
-    predicted_val = _predict_single_step(model_obj, scaler_obj, model_type, df["close"], timestep)
+    predicted_val = _ensure_finite_prediction(
+        _predict_single_step(model_obj, scaler_obj, model_type, df["close"], timestep),
+        model_id,
+        model_type,
+    )
 
     # 4. Determine signal for current prediction
     current_signal_info = get_current_signal_analysis(model_id, df)
@@ -571,7 +592,7 @@ def run_live_prediction(model_id: str) -> Dict[str, Any]:
     # 9. Extract original training snapshot
     training_snapshot = metadata.get("training_snapshot", {})
 
-    return {
+    result = {
         "model_id": model_id,
         "name": metadata["name"],
         "symbol": symbol,
@@ -591,6 +612,13 @@ def run_live_prediction(model_id: str) -> Dict[str, Any]:
         "post_save_strategy": post_save_strategy_analysis,
         "current_signal": updated_signal,
     }
+    non_finite = find_non_finite_values(result, "live_monitoring")
+    if non_finite:
+        logger.warning(
+            "Live monitoring result contained non-finite values before JSON sanitization: %s",
+            ", ".join(f"{path}={value!r}" for path, value in non_finite),
+        )
+    return sanitize_for_json(result)
 
 
 def _build_live_prediction_chart(

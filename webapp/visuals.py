@@ -5,9 +5,11 @@ import json
 import pandas as pd
 import plotly.graph_objects as go
 
+from .serialization import sanitize_for_json
+
 
 def figure_to_json(fig: go.Figure):
-    return json.loads(fig.to_json())
+    return sanitize_for_json(json.loads(fig.to_json()))
 
 
 def build_prediction_comparison_figure(plot_df_split: pd.DataFrame, model_names, symbol: str, train_size: int):

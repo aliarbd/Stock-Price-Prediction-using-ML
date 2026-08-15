@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+import logging
 import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
@@ -37,6 +38,7 @@ from webapp.prediction_service import (
     run_live_prediction,
 )
 from webapp.scheduler import start_scheduler, stop_scheduler
+from webapp.serialization import find_non_finite_values, sanitize_for_json
 
 BASE_DIR = Path(__file__).resolve().parent
 TEMPLATES_DIR = BASE_DIR / "templates"
@@ -45,6 +47,7 @@ STATIC_DIR = BASE_DIR / "static"
 app = FastAPI(title="Stock Prediction Web App", version="1.1.0")
 app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 templates = Jinja2Templates(directory=str(TEMPLATES_DIR))
+logger = logging.getLogger(__name__)
 
 
 @app.exception_handler(Exception)
@@ -240,7 +243,7 @@ async def get_run(job_id: str):
         "result": job.get("result"),
         "error": job.get("error"),
     }
-    return JSONResponse(clean_job)
+    return JSONResponse(sanitize_for_json(clean_job))
 
 
 @app.post("/api/models/save")
@@ -319,21 +322,21 @@ async def save_model_endpoint(payload: SaveModelRequest):
         training_snapshot=training_snapshot,
     )
 
-    return {
+    return sanitize_for_json({
         "status": "success",
         "model_id": model_id,
         "name": display_name,
         "symbol": config.stock_symbol,
         "model_type": model_name,
         "metadata": saved_metadata,
-    }
+    })
 
 
 @app.get("/api/models")
 async def list_models_endpoint(symbol: Optional[str] = None):
     """List all saved models."""
     models = list_models(symbol=symbol)
-    return JSONResponse(models)
+    return JSONResponse(sanitize_for_json(models))
 
 
 @app.get("/api/models/{model_id}")
@@ -353,7 +356,13 @@ async def get_model_endpoint(model_id: str):
     except Exception:
         pass
 
-    return JSONResponse(model_info)
+    non_finite = find_non_finite_values(model_info, f"model_info[{model_id}]")
+    if non_finite:
+        logger.warning(
+            "Model detail response contained non-finite values before JSON sanitization: %s",
+            ", ".join(f"{path}={value!r}" for path, value in non_finite),
+        )
+    return JSONResponse(sanitize_for_json(model_info))
 
 
 @app.get("/api/models/{model_id}/training-summary")
@@ -362,7 +371,7 @@ async def get_training_summary_endpoint(model_id: str):
     model_info = get_model(model_id)
     if not model_info:
         raise HTTPException(status_code=404, detail=f"Saved model {model_id} not found.")
-    return JSONResponse(model_info.get("training_snapshot", {}))
+    return JSONResponse(sanitize_for_json(model_info.get("training_snapshot", {})))
 
 
 @app.get("/api/models/{model_id}/post-save-predictions")
@@ -374,7 +383,7 @@ async def get_post_save_predictions_endpoint(model_id: str):
     try:
         df = load_data(model_info["symbol"], model_info["exchange"], dataset_length=500)
         res = get_post_save_predictions_analysis(model_id, df)
-        return JSONResponse(res)
+        return JSONResponse(sanitize_for_json(res))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -388,7 +397,7 @@ async def get_post_save_strategy_endpoint(model_id: str):
     try:
         df = load_data(model_info["symbol"], model_info["exchange"], dataset_length=500)
         res = get_post_save_strategy_analysis(model_id, df)
-        return JSONResponse(res)
+        return JSONResponse(sanitize_for_json(res))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -402,7 +411,7 @@ async def get_current_signal_endpoint(model_id: str):
     try:
         df = load_data(model_info["symbol"], model_info["exchange"], dataset_length=500)
         res = get_current_signal_analysis(model_id, df)
-        return JSONResponse(res)
+        return JSONResponse(sanitize_for_json(res))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -421,7 +430,7 @@ async def live_predict_endpoint(model_id: str):
     """Execute zero-retrain live prediction using fresh market data."""
     try:
         res = run_live_prediction(model_id)
-        return JSONResponse(res)
+        return JSONResponse(sanitize_for_json(res))
     except Exception as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
@@ -496,7 +505,7 @@ async def retrain_model_endpoint(model_id: str):
 async def get_predictions_endpoint(model_id: str, limit: int = 100):
     """Retrieve prediction history for a specific model."""
     predictions = get_model_predictions(model_id, limit=limit)
-    return JSONResponse(predictions)
+    return JSONResponse(sanitize_for_json(predictions))
 
 
 @app.post("/api/models/{model_id}/activate")

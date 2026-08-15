@@ -228,7 +228,8 @@
       document.getElementById("m-mae").textContent = met.MAE != null ? Number(met.MAE).toFixed(4) : "-";
       document.getElementById("m-mape").textContent = met.MAPE != null ? Number(met.MAPE).toFixed(2) + "%" : "-";
       document.getElementById("m-da").textContent = met["Directional Accuracy (%)"] != null ? Number(met["Directional Accuracy (%)"]).toFixed(2) + "%" : "-";
-      document.getElementById("m-r2").textContent = met["R2"] != null ? Number(met["R2"]).toFixed(4) : "-";
+      const r2Value = met["R2"] ?? met["R²"];
+      document.getElementById("m-r2").textContent = r2Value != null ? Number(r2Value).toFixed(4) : "-";
       document.getElementById("m-time").textContent = met["Training Time (s)"] != null ? Number(met["Training Time (s)"]).toFixed(2) + "s" : "-";
 
       // Live Post-Save Metrics
